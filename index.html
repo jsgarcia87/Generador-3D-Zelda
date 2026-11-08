@@ -1,0 +1,1173 @@
+```html
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Majora's Mask - Generador de Peana 3D Imprimible (STL)</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Three.js r128 y complementos -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/exporters/STLExporter.js"></script>
+    <!-- Iconos Phosphor -->
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700;800&family=Inter:wght@300;400;500;600;700&display=swap');
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #0d0b14;
+            color: #f3f4f6;
+            overflow: hidden;
+            user-select: none;
+        }
+
+        .font-zelda {
+            font-family: 'Cinzel', serif;
+        }
+
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar {
+            width: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #161224;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #4c1d95;
+            border-radius: 3px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #7c3aed;
+        }
+
+        /* Sliders personalizados */
+        input[type=range] {
+            -webkit-appearance: none;
+            background: transparent;
+        }
+        input[type=range]::-webkit-slider-runnable-track {
+            width: 100%;
+            height: 6px;
+            cursor: pointer;
+            background: #2e2640;
+            border-radius: 4px;
+            border: 1px solid #4c1d95;
+        }
+        input[type=range]::-webkit-slider-thumb {
+            height: 18px;
+            width: 18px;
+            border-radius: 50%;
+            background: #eab308;
+            border: 2px solid #fef08a;
+            cursor: pointer;
+            -webkit-appearance: none;
+            margin-top: -7px;
+            box-shadow: 0 0 10px rgba(234, 179, 8, 0.6);
+            transition: transform 0.15s ease;
+        }
+        input[type=range]::-webkit-slider-thumb:hover {
+            transform: scale(1.15);
+            background: #facc15;
+        }
+
+        .glass-panel {
+            background: rgba(20, 16, 32, 0.85);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(139, 92, 246, 0.25);
+        }
+
+        .majora-gradient {
+            background: linear-gradient(135deg, #581c87 0%, #991b1b 50%, #ca8a04 100%);
+        }
+    </style>
+</head>
+<body class="w-screen h-screen flex flex-col md:flex-row relative">
+
+    <!-- Lienzo 3D -->
+    <div id="canvas-container" class="relative flex-1 h-full w-full overflow-hidden">
+        
+        <!-- Encabezado flotante superior -->
+        <div class="absolute top-4 left-4 right-4 md:right-auto z-10 flex flex-col gap-2 pointer-events-none">
+            <div class="glass-panel px-5 py-3.5 rounded-2xl shadow-2xl border-l-4 border-l-yellow-500 pointer-events-auto max-w-md">
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 rounded-xl majora-gradient flex items-center justify-center shadow-lg shrink-0">
+                        <i class="ph-fill ph-mask-happy text-2xl text-yellow-200"></i>
+                    </div>
+                    <div>
+                        <h1 class="font-zelda text-lg md:text-xl font-bold tracking-wider text-yellow-400 leading-tight">
+                            TERMINA FORGE 3D
+                        </h1>
+                        <p class="text-xs text-purple-200/80">Generador Paramétrico de Peana • Majora's Mask</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Indicador de Dimensiones Reales (Bounding Box en mm) -->
+            <div class="glass-panel px-4 py-2.5 rounded-xl shadow-lg pointer-events-auto inline-flex items-center gap-4 self-start text-xs">
+                <span class="text-purple-300 font-semibold flex items-center gap-1.5">
+                    <i class="ph ph-ruler text-yellow-400 text-base"></i> Escala Real (1ud = 1mm):
+                </span>
+                <div class="flex gap-3 font-mono text-gray-200">
+                    <span><strong class="text-red-400">X:</strong> <span id="dim-x">75.0</span>mm</span>
+                    <span><strong class="text-blue-400">Y (Prof):</strong> <span id="dim-z">82.0</span>mm</span>
+                    <span><strong class="text-green-400">Z (Alto):</strong> <span id="dim-y">28.5</span>mm</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Selector rápido de Acabado / Material (Flotante abajo izquierda) -->
+        <div class="absolute bottom-4 left-4 z-10 flex flex-wrap gap-2 max-w-full pr-4">
+            <button onclick="setFinishMode('painted')" id="btn-mode-painted" class="finish-btn active-finish glass-panel px-3.5 py-2 rounded-xl text-xs font-medium flex items-center gap-2 hover:bg-purple-900/50 transition border border-yellow-500/60 bg-purple-950/70 text-yellow-300 shadow-lg">
+                <span class="w-3 h-3 rounded-full bg-gradient-to-tr from-purple-600 via-red-500 to-yellow-400"></span>
+                Vista Pintada (Majora)
+            </button>
+            <button onclick="setFinishMode('resin')" id="btn-mode-resin" class="finish-btn glass-panel px-3.5 py-2 rounded-xl text-xs font-medium flex items-center gap-2 hover:bg-purple-900/50 transition text-gray-300">
+                <span class="w-3 h-3 rounded-full bg-gray-400"></span>
+                Resina Gris (Slicer)
+            </button>
+            <button onclick="setFinishMode('gold')" id="btn-mode-gold" class="finish-btn glass-panel px-3.5 py-2 rounded-xl text-xs font-medium flex items-center gap-2 hover:bg-purple-900/50 transition text-gray-300">
+                <span class="w-3 h-3 rounded-full bg-amber-500"></span>
+                PLA Bronce Antiguo
+            </button>
+            <button onclick="setFinishMode('wireframe')" id="btn-mode-wireframe" class="finish-btn glass-panel px-3.5 py-2 rounded-xl text-xs font-medium flex items-center gap-2 hover:bg-purple-900/50 transition text-gray-300">
+                <i class="ph ph-polygon text-purple-400"></i>
+                Malla (Wireframe)
+            </button>
+        </div>
+
+        <!-- Controles de cámara rápidos (Arriba derecha en el visor) -->
+        <div class="absolute top-4 right-4 z-10 flex flex-col gap-2">
+            <button onclick="resetCamera('iso')" title="Vista Isométrica" class="glass-panel p-2.5 rounded-xl hover:bg-purple-800/40 text-purple-200 transition shadow-md">
+                <i class="ph ph-cube text-lg"></i>
+            </button>
+            <button onclick="resetCamera('top')" title="Vista Superior (Zona de Posado)" class="glass-panel p-2.5 rounded-xl hover:bg-purple-800/40 text-purple-200 transition shadow-md">
+                <i class="ph ph-arrow-line-down text-lg"></i>
+            </button>
+            <button onclick="resetCamera('front')" title="Vista Frontal (Máscara)" class="glass-panel p-2.5 rounded-xl hover:bg-purple-800/40 text-purple-200 transition shadow-md">
+                <i class="ph ph-eye text-lg"></i>
+            </button>
+            <button onclick="toggleAutoRotate()" id="btn-autorotate" title="Autorrotación" class="glass-panel p-2.5 rounded-xl hover:bg-purple-800/40 text-yellow-400 border-yellow-500/40 transition shadow-md">
+                <i class="ph ph-arrows-clockwise text-lg"></i>
+            </button>
+        </div>
+    </div>
+
+    <!-- Panel Lateral de Control Paramétrico y Exportación STL -->
+    <aside class="w-full md:w-96 h-[48vh] md:h-full glass-panel border-t md:border-t-0 md:border-l border-purple-800/40 flex flex-col z-20 shrink-0">
+        
+        <!-- Cabecera del panel -->
+        <div class="px-5 py-4 border-b border-purple-900/60 flex items-center justify-between">
+            <div class="flex items-center gap-2">
+                <i class="ph-fill ph-sliders-horizontal text-yellow-400 text-lg"></i>
+                <h2 class="font-semibold text-sm uppercase tracking-wider text-purple-100">Parámetros de Impresión 3D</h2>
+            </div>
+            <span class="text-[11px] bg-green-950/90 text-green-400 border border-green-700/50 px-2 py-0.5 rounded-full font-medium flex items-center gap-1">
+                <span class="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse"></span> Sólido / Manifold
+            </span>
+        </div>
+
+        <!-- Controles desplazables -->
+        <div class="flex-1 overflow-y-auto p-5 space-y-6 text-sm">
+
+            <!-- 1. Dimensiones de la Base -->
+            <div class="space-y-4">
+                <h3 class="text-xs font-bold uppercase tracking-wider text-yellow-500/90 flex items-center gap-1.5">
+                    <i class="ph-fill ph-circle-half-tilt"></i> 1. Geometría de la Peana (Términa)
+                </h3>
+
+                <!-- Diámetro -->
+                <div>
+                    <div class="flex justify-between text-xs mb-1.5">
+                        <span class="text-gray-300">Diámetro de la Plataforma</span>
+                        <span id="val-diameter" class="font-mono font-semibold text-yellow-400">75 mm</span>
+                    </div>
+                    <input type="range" id="param-diameter" min="40" max="130" step="5" value="75" class="w-full">
+                    <div class="flex justify-between text-[10px] text-gray-500 mt-1">
+                        <button onclick="setQuickDiameter(50)" class="hover:text-purple-300">50mm (Mini)</button>
+                        <button onclick="setQuickDiameter(75)" class="hover:text-purple-300">75mm (Estándar)</button>
+                        <button onclick="setQuickDiameter(100)" class="hover:text-purple-300">100mm (Escala 1/8)</button>
+                        <button onclick="setQuickDiameter(120)" class="hover:text-purple-300">120mm (Diorama)</button>
+                    </div>
+                </div>
+
+                <!-- Altura de la Base -->
+                <div>
+                    <div class="flex justify-between text-xs mb-1.5">
+                        <span class="text-gray-300">Grosor / Altura de Base</span>
+                        <span id="val-height" class="font-mono font-semibold text-yellow-400">12 mm</span>
+                    </div>
+                    <input type="range" id="param-height" min="6" max="24" step="1" value="12" class="w-full">
+                </div>
+
+                <!-- Estilo del Borde -->
+                <div>
+                    <label class="block text-xs text-gray-300 mb-1.5">Arquitectura del Zócalo</label>
+                    <div class="grid grid-cols-2 gap-2">
+                        <button onclick="setRimStyle('dodecagon')" id="rim-dodecagon" class="py-2 px-3 rounded-lg text-xs font-medium border border-yellow-500 bg-purple-900/50 text-yellow-300 transition flex items-center justify-center gap-1.5">
+                            <i class="ph ph-polygon"></i> Piedra Tallada (12 Lados)
+                        </button>
+                        <button onclick="setRimStyle('round')" id="rim-round" class="py-2 px-3 rounded-lg text-xs font-medium border border-purple-800/60 bg-purple-950/30 text-gray-400 hover:text-gray-200 transition flex items-center justify-center gap-1.5">
+                            <i class="ph ph-circle"></i> Circular Clásica
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <hr class="border-purple-900/50">
+
+            <!-- 2. Elementos Escultóricos Majora's Mask -->
+            <div class="space-y-4">
+                <h3 class="text-xs font-bold uppercase tracking-wider text-yellow-500/90 flex items-center gap-1.5">
+                    <i class="ph-fill ph-mask-happy"></i> 2. Relieves y Escultura Temática
+                </h3>
+
+                <!-- Emblema Frontal Máscara de Majora -->
+                <div class="flex items-center justify-between bg-purple-950/40 p-3 rounded-xl border border-purple-800/40">
+                    <div>
+                        <div class="font-medium text-xs text-gray-200">Emblema Frontal: Máscara de Majora</div>
+                        <div class="text-[11px] text-gray-400">Inclinado a 50° en el bisel delantero (sin estorbar pies)</div>
+                    </div>
+                    <label class="relative inline-flex items-center cursor-pointer">
+                        <input type="checkbox" id="param-mask" checked class="sr-only peer">
+                        <div class="w-10 h-5 bg-gray-700 rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-yellow-500"></div>
+                    </label>
+                </div>
+
+                <!-- Escala de la Máscara -->
+                <div id="mask-scale-container">
+                    <div class="flex justify-between text-xs mb-1">
+                        <span class="text-gray-300">Tamaño del Emblema de Majora</span>
+                        <span id="val-mask-scale" class="font-mono font-semibold text-yellow-400">100%</span>
+                    </div>
+                    <input type="range" id="param-mask-scale" min="70" max="135" step="5" value="100" class="w-full">
+                </div>
+
+                <!-- Pilares Traseros / Rocas de Términa -->
+                <div class="flex items-center justify-between bg-purple-950/40 p-3 rounded-xl border border-purple-800/40">
+                    <div>
+                        <div class="font-medium text-xs text-gray-200">Monolitos y Cristales Traseros</div>
+                        <div class="text-[11px] text-gray-400">Arco de ruinas en el borde posterior</div>
+                    </div>
+                    <label class="relative inline-flex items-center cursor-pointer">
+                        <input type="checkbox" id="param-pillars" checked class="sr-only peer">
+                        <div class="w-10 h-5 bg-gray-700 rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-yellow-500"></div>
+                    </label>
+                </div>
+
+                <!-- Profundidad del Grabado del Reloj + Trifuerza -->
+                <div>
+                    <div class="flex justify-between text-xs mb-1">
+                        <span class="text-gray-300">Relieve Superior (Reloj de Términa + Trifuerza)</span>
+                        <span id="val-relief" class="font-mono font-semibold text-yellow-400">1.2 mm</span>
+                    </div>
+                    <input type="range" id="param-relief" min="0.4" max="2.2" step="0.2" value="1.2" class="w-full">
+                </div>
+            </div>
+
+            <hr class="border-purple-900/50">
+
+            <!-- 3. Anclaje para la Figura (Pegs / Agujeros) -->
+            <div class="space-y-3">
+                <h3 class="text-xs font-bold uppercase tracking-wider text-yellow-500/90 flex items-center gap-1.5">
+                    <i class="ph-fill ph-push-pin"></i> 3. Fijación para Figura (Zona Central Libre)
+                </h3>
+                <p class="text-[11px] text-gray-400 leading-relaxed">
+                    La superficie central queda plana para posar los pies de cualquier figura. Puedes añadir encajes cilíndricos de anclaje:
+                </p>
+
+                <div class="grid grid-cols-3 gap-2">
+                    <button onclick="setPegMode('none')" id="peg-none" class="py-2 px-2 rounded-lg text-xs font-medium border border-yellow-500 bg-purple-900/50 text-yellow-300 transition text-center">
+                        Liso (Sin pernos)
+                    </button>
+                    <button onclick="setPegMode('single')" id="peg-single" class="py-2 px-2 rounded-lg text-xs font-medium border border-purple-800/60 bg-purple-950/30 text-gray-400 hover:text-gray-200 transition text-center">
+                        1 Perno Central (Ø3.2mm)
+                    </button>
+                    <button onclick="setPegMode('double')" id="peg-double" class="py-2 px-2 rounded-lg text-xs font-medium border border-purple-800/60 bg-purple-950/30 text-gray-400 hover:text-gray-200 transition text-center">
+                        2 Sokets Pies (Ø3.2mm)
+                    </button>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- Pie con Botón de Descarga STL -->
+        <div class="p-4 border-t border-purple-900/70 bg-black/40 space-y-2.5">
+            <button onclick="exportToSTL()" class="w-full py-3.5 px-4 rounded-xl font-bold text-sm text-gray-950 bg-gradient-to-r from-yellow-400 via-amber-500 to-yellow-500 hover:from-yellow-300 hover:to-amber-400 active:scale-[0.99] transition shadow-lg shadow-yellow-500/20 flex items-center justify-center gap-2">
+                <i class="ph-bold ph-download-simple text-lg"></i>
+                DESCARGAR ARCHIVO .STL (IMPRIMIBLE)
+            </button>
+            <div class="flex items-center justify-between text-[11px] text-gray-400 px-1">
+                <span><i class="ph-fill ph-check-circle text-green-400"></i> Base inferior 100% plana (Z=0)</span>
+                <span id="poly-count">~18,400 tris</span>
+            </div>
+        </div>
+
+    </aside>
+
+    <!-- Notificación Toast para descarga -->
+    <div id="toast" class="fixed bottom-6 right-6 z-50 transform translate-y-24 opacity-0 transition-all duration-300 pointer-events-none">
+        <div class="glass-panel border-l-4 border-l-green-400 px-5 py-3.5 rounded-xl shadow-2xl flex items-center gap-3">
+            <i class="ph-fill ph-check-circle text-2xl text-green-400"></i>
+            <div>
+                <h4 class="text-sm font-bold text-white">¡Archivo STL generado con éxito!</h4>
+                <p class="text-xs text-gray-300">Listo para importar en Cura, PrusaSlicer o Bambu Studio.</p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ============================================================================
+        // CONFIGURACIÓN GLOBAL Y ESTADO PARAMÉTRICO
+        // ============================================================================
+        const state = {
+            diameter: 75,         // mm (radio = 37.5mm)
+            height: 12,           // mm
+            rimStyle: 'dodecagon',// 'dodecagon' | 'round'
+            showMask: true,       // Emblema frontal Majora
+            maskScale: 1.0,       // Escala del emblema frontal
+            showPillars: true,    // Ruinas y cristales traseros
+            reliefHeight: 1.2,    // mm de altorrelieve del dial de la Torre del Reloj
+            pegMode: 'none',      // 'none' | 'single' | 'double'
+            finishMode: 'painted' // 'painted' | 'resin' | 'gold' | 'wireframe'
+        };
+
+        let scene, camera, renderer, controls;
+        let baseGroup; // Grupo que contiene todas las mallas sólidas exportables al STL
+        let gridHelper;
+
+        // Colección de materiales para alternar entre Vista Pintada, Resina Gris, Bronce y Wireframe
+        const materials = {
+            painted: {},
+            resin: null,
+            gold: null,
+            wireframe: null
+        };
+
+        // ============================================================================
+        // INICIALIZACIÓN DE THREE.JS
+        // ============================================================================
+        function initThree() {
+            const container = document.getElementById('canvas-container');
+
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0x0d0b14);
+            scene.fog = new THREE.FogExp2(0x0d0b14, 0.0022);
+
+            camera = new THREE.PerspectiveCamera(42, container.clientWidth / container.clientHeight, 1, 1000);
+            camera.position.set(0, 75, 130);
+
+            renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance" });
+            renderer.setSize(container.clientWidth, container.clientHeight);
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+            renderer.shadowMap.enabled = true;
+            renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+            renderer.toneMapping = THREE.ACESFilmicToneMapping;
+            renderer.toneMappingExposure = 1.15;
+            container.appendChild(renderer.domElement);
+
+            controls = new THREE.OrbitControls(camera, renderer.domElement);
+            controls.enableDamping = true;
+            controls.dampingFactor = 0.06;
+            controls.target.set(0, 8, 0);
+            controls.maxPolarAngle = Math.PI / 2 + 0.15; // Permite ver la base plana desde abajo ligeramente
+            controls.minDistance = 35;
+            controls.maxDistance = 300;
+            controls.autoRotate = true;
+            controls.autoRotateSpeed = 0.8;
+
+            setupLights();
+            initMaterials();
+            setupBuildPlateGrid();
+
+            baseGroup = new THREE.Group();
+            scene.add(baseGroup);
+
+            // Construir la peana por primera vez
+            rebuildBaseModel();
+
+            // Eventos UI y ventana
+            window.addEventListener('resize', onWindowResize);
+            bindUIEvents();
+
+            animate();
+        }
+
+        // ============================================================================
+        // ILUMINACIÓN DE ESTUDIO
+        // ============================================================================
+        function setupLights() {
+            const ambientLight = new THREE.AmbientLight(0xd8b4fe, 0.45);
+            scene.add(ambientLight);
+
+            // Luz principal cálida (Sol de Términa)
+            const mainLight = new THREE.DirectionalLight(0xfffbeb, 1.35);
+            mainLight.position.set(60, 110, 80);
+            mainLight.castShadow = true;
+            mainLight.shadow.mapSize.width = 2048;
+            mainLight.shadow.mapSize.height = 2048;
+            mainLight.shadow.camera.near = 10;
+            mainLight.shadow.camera.far = 300;
+            const d = 85;
+            mainLight.shadow.camera.left = -d;
+            mainLight.shadow.camera.right = d;
+            mainLight.shadow.camera.top = d;
+            mainLight.shadow.camera.bottom = -d;
+            mainLight.shadow.bias = -0.0005;
+            scene.add(mainLight);
+
+            // Luz de contra púrpura/mágica (Majora's Wrath)
+            const rimLight = new THREE.DirectionalLight(0xa855f7, 0.9);
+            rimLight.position.set(-70, 50, -70);
+            scene.add(rimLight);
+
+            // Luz de relleno frontal suave para destacar la máscara
+            const frontFill = new THREE.DirectionalLight(0xfde047, 0.5);
+            frontFill.position.set(0, 20, 100);
+            scene.add(frontFill);
+        }
+
+        // ============================================================================
+        // MATERIALES (PINTADO / RESINA GRIS SLICER / BRONCE / WIREFRAME)
+        // ============================================================================
+        function initMaterials() {
+            // 1. Paleta Pintada (Majora's Mask)
+            materials.painted = {
+                stoneDark: new THREE.MeshStandardMaterial({ color: 0x2a2438, roughness: 0.8, metalness: 0.15 }),
+                stoneMid: new THREE.MeshStandardMaterial({ color: 0x3b334d, roughness: 0.75, metalness: 0.15 }),
+                stoneLight: new THREE.MeshStandardMaterial({ color: 0x514766, roughness: 0.65, metalness: 0.2 }),
+                clockGold: new THREE.MeshStandardMaterial({ color: 0xd99b26, roughness: 0.35, metalness: 0.75 }),
+                triforceGold: new THREE.MeshStandardMaterial({ color: 0xfacc15, roughness: 0.25, metalness: 0.85, emissive: 0x422006, emissiveIntensity: 0.2 }),
+                maskPurple: new THREE.MeshStandardMaterial({ color: 0x5b21b6, roughness: 0.4, metalness: 0.25 }),
+                maskRed: new THREE.MeshStandardMaterial({ color: 0xdc2626, roughness: 0.38, metalness: 0.2 }),
+                maskOrange: new THREE.MeshStandardMaterial({ color: 0xea580c, roughness: 0.35, metalness: 0.2 }),
+                maskYellow: new THREE.MeshStandardMaterial({ color: 0xfacc15, roughness: 0.3, metalness: 0.4 }),
+                maskTeal: new THREE.MeshStandardMaterial({ color: 0x14b8a6, roughness: 0.4, metalness: 0.2 }),
+                maskEyeGreen: new THREE.MeshStandardMaterial({ color: 0x84cc16, roughness: 0.25, metalness: 0.3 }),
+                crystalPurple: new THREE.MeshStandardMaterial({ color: 0x9333ea, roughness: 0.2, metalness: 0.5, emissive: 0x3b0764, emissiveIntensity: 0.35 })
+            };
+
+            // 2. Resina Gris de Escultura (Ideal para inspeccionar relieves antes de imprimir)
+            materials.resin = new THREE.MeshStandardMaterial({
+                color: 0x8b929a,
+                roughness: 0.48,
+                metalness: 0.12
+            });
+
+            // 3. Filamento PLA Seda Bronce/Oro Antiguo
+            materials.gold = new THREE.MeshStandardMaterial({
+                color: 0xc59b27,
+                roughness: 0.32,
+                metalness: 0.78
+            });
+
+            // 4. Malla / Wireframe
+            materials.wireframe = new THREE.MeshBasicMaterial({
+                color: 0xc084fc,
+                wireframe: true
+            });
+        }
+
+        function getMat(key) {
+            if (state.finishMode === 'painted') {
+                return materials.painted[key] || materials.painted.stoneMid;
+            } else if (state.finishMode === 'resin') {
+                return materials.resin;
+            } else if (state.finishMode === 'gold') {
+                return materials.gold;
+            } else {
+                return materials.wireframe;
+            }
+        }
+
+        // ============================================================================
+        // CAMA DE IMPRESIÓN 3D (REFERENCIA VISUAL EN MILÍMETROS)
+        // ============================================================================
+        function setupBuildPlateGrid() {
+            if (gridHelper) scene.remove(gridHelper);
+            // Cuadrícula de 160x160mm (cada cuadro = 10mm = 1cm)
+            gridHelper = new THREE.GridHelper(160, 16, 0xca8a04, 0x2e2246);
+            gridHelper.position.y = 0; // Nivel Z=0 exacto de la cama de impresión
+            scene.add(gridHelper);
+        }
+
+        // ============================================================================
+        // GENERACIÓN PROCEDURAL DE LA PEANA SÓLIDA ("WATERTIGHT" / APTA PARA SLICER)
+        // ============================================================================
+        function rebuildBaseModel() {
+            // Limpiar geometrías previas de la memoria
+            while (baseGroup.children.length > 0) {
+                const child = baseGroup.children[0];
+                if (child.geometry) child.geometry.dispose();
+                baseGroup.remove(child);
+            }
+
+            const R = state.diameter / 2;
+            const H = state.height;
+            const radialSegments = state.rimStyle === 'dodecagon' ? 12 : 64;
+
+            // ------------------------------------------------------------------------
+            // 1. CUERPO ESCALONADO DE LA PEANA (ZÓCALO DE PIEDRA DE TÉRMINA)
+            // Todas las piezas empiezan o se solapan desde Y=0 para garantizar una base 100% plana
+            // ------------------------------------------------------------------------
+
+            // Peldaño inferior con bisel (desde Y=0 hasta Y=H*0.45)
+            const tier1H = H * 0.45;
+            const tier1Geo = new THREE.CylinderGeometry(R * 0.96, R, tier1H, radialSegments);
+            tier1Geo.translate(0, tier1H / 2, 0);
+            addSolidMesh(tier1Geo, 'stoneDark');
+
+            // Anillo intermedio octogonal/dodecagonal biselado (solapado desde Y=0 hasta Y=H*0.80)
+            const tier2H = H * 0.80;
+            const tier2Geo = new THREE.CylinderGeometry(R * 0.88, R * 0.93, tier2H, radialSegments);
+            tier2Geo.translate(0, tier2H / 2, 0);
+            addSolidMesh(tier2Geo, 'stoneMid');
+
+            // Plataforma superior principal (solapada desde Y=0 hasta Y=H)
+            const tier3Geo = new THREE.CylinderGeometry(R * 0.83, R * 0.86, H, 64);
+            tier3Geo.translate(0, H / 2, 0);
+            addSolidMesh(tier3Geo, 'stoneLight');
+
+            // Anillo perimetral superior de contención (bordillo rúnico de la Torre del Reloj)
+            const rimOuterR = R * 0.84;
+            const rimInnerR = R * 0.76;
+            const rimHeight = state.reliefHeight * 1.15;
+            const ringShape = new THREE.Shape();
+            ringShape.absarc(0, 0, rimOuterR, 0, Math.PI * 2, false);
+            const ringHole = new THREE.Path();
+            ringHole.absarc(0, 0, rimInnerR, 0, Math.PI * 2, true);
+            ringShape.holes.push(ringHole);
+
+            const extrudeRimSettings = {
+                depth: rimHeight + 1.0, // Hundido 1mm dentro de la base para unión booleana limpia
+                bevelEnabled: true,
+                bevelSegments: 2,
+                steps: 1,
+                bevelSize: 0.4,
+                bevelThickness: 0.4
+            };
+            const rimGeo = new THREE.ExtrudeGeometry(ringShape, extrudeRimSettings);
+            rimGeo.rotateX(-Math.PI / 2);
+            rimGeo.translate(0, H - 1.0, 0);
+            addSolidMesh(rimGeo, 'clockGold');
+
+            // Contrafuertes perimetrales de piedra alrededor del zócalo (12 bloques tallados)
+            const numButtresses = 12;
+            for (let i = 0; i < numButtresses; i++) {
+                const angle = (i / numButtresses) * Math.PI * 2 + (Math.PI / 12);
+                // Dejar libre el frontal si está la máscara de Majora
+                const isFront = Math.abs(angle - Math.PI / 2) < 0.35;
+                if (state.showMask && isFront) continue;
+
+                const bw = R * 0.14;
+                const bd = R * 0.12;
+                const bh = H * 0.85;
+                const buttressGeo = new THREE.BoxGeometry(bw, bh, bd);
+                // Inclinación piramidal hacia el centro
+                const pos = buttressGeo.attributes.position;
+                for (let j = 0; j < pos.count; j++) {
+                    if (pos.getY(j) > 0) {
+                        pos.setX(j, pos.getX(j) * 0.72);
+                        pos.setZ(j, pos.getZ(j) * 0.72);
+                    }
+                }
+                buttressGeo.computeVertexNormals();
+                buttressGeo.translate(0, bh / 2, R * 0.88);
+                buttressGeo.rotateY(-angle + Math.PI / 2);
+                addSolidMesh(buttressGeo, 'stoneDark');
+            }
+
+            // ------------------------------------------------------------------------
+            // 2. RELIEVE SUPERIOR: RELOJ DE LA TORRE DE TÉRMINA Y TRIFUERZA CENTRAL
+            // Todo plano y de bajo perfil para no estorbar la suela de la figura
+            // ------------------------------------------------------------------------
+            buildClockTowerDialRelief(R, H, state.reliefHeight);
+
+            // ------------------------------------------------------------------------
+            // 3. EMBLEMA FRONTAL ESCULPIDO DE LA MÁSCARA DE MAJORA (INCLINADO A 50°)
+            // Ubicado en el borde delantero (+Z) por debajo del plano de los pies
+            // ------------------------------------------------------------------------
+            if (state.showMask) {
+                buildMajorasMaskEmblem(R, H, state.maskScale);
+            }
+
+            // ------------------------------------------------------------------------
+            // 4. RUINAS Y CRISTALES TRASEROS DE TÉRMINA (BORDE POSTERIOR -Z)
+            // Enmarcan la figura por detrás dejando el centro 100% despejado
+            // ------------------------------------------------------------------------
+            if (state.showPillars) {
+                buildBackPillarsAndCrystals(R, H);
+            }
+
+            // ------------------------------------------------------------------------
+            // 5. PERNOS / BASES DE ANCLAJE PARA LA FIGURA (OPCIONAL)
+            // ------------------------------------------------------------------------
+            if (state.pegMode !== 'none') {
+                buildFigurePegs(R, H);
+            }
+
+            // Actualizar contador de polígonos y dimensiones reales X, Y, Z
+            updateMetricsDisplay();
+        }
+
+        // ============================================================================
+        // GRABADO SUPERIOR: DIAL DEL RELOJ DE 3 DÍAS + TRIFUERZA + MARCAS DEL TIEMPO
+        // ============================================================================
+        function buildClockTowerDialRelief(R, H, reliefH) {
+            const innerR = R * 0.75;
+            const embed = 0.8; // Solapamiento interno para malla sólida en el laminador
+
+            // 1. Anillo concéntrico del reloj solar/lunar
+            const dialRingShape = new THREE.Shape();
+            dialRingShape.absarc(0, 0, innerR * 0.72, 0, Math.PI * 2, false);
+            const dialHole = new THREE.Path();
+            dialHole.absarc(0, 0, innerR * 0.65, 0, Math.PI * 2, true);
+            dialRingShape.holes.push(dialHole);
+
+            const dialGeo = new THREE.ExtrudeGeometry(dialRingShape, {
+                depth: embed + reliefH * 0.7,
+                bevelEnabled: false,
+                curveSegments: 48
+            });
+            dialGeo.rotateX(-Math.PI / 2);
+            dialGeo.translate(0, H - embed, 0);
+            addSolidMesh(dialGeo, 'clockGold');
+
+            // 2. 12 Marcas horarias triangulares del Reloj de Términa
+            for (let i = 0; i < 12; i++) {
+                const angle = (i / 12) * Math.PI * 2;
+                const tickShape = new THREE.Shape();
+                const w = R * 0.035;
+                const len = R * 0.14;
+                tickShape.moveTo(-w, 0);
+                tickShape.lineTo(w, 0);
+                tickShape.lineTo(0, len);
+                tickShape.closePath();
+
+                const tickGeo = new THREE.ExtrudeGeometry(tickShape, {
+                    depth: embed + reliefH * 0.65,
+                    bevelEnabled: false
+                });
+                tickGeo.rotateX(-Math.PI / 2);
+                tickGeo.translate(0, H - embed, -innerR * 0.72);
+                tickGeo.rotateY(angle);
+                addSolidMesh(tickGeo, 'clockGold');
+            }
+
+            // 3. Símbolo de la Trifuerza Sagrada en el centro de la plataforma
+            const triSize = R * 0.34;
+            const hTri = triSize * Math.sqrt(3) / 2;
+
+            const createTriangleMesh = (cx, cz, side) => {
+                const h = side * Math.sqrt(3) / 2;
+                const s = new THREE.Shape();
+                s.moveTo(0, (2 / 3) * h);
+                s.lineTo(-side / 2, -(1 / 3) * h);
+                s.lineTo(side / 2, -(1 / 3) * h);
+                s.closePath();
+
+                const geo = new THREE.ExtrudeGeometry(s, {
+                    depth: embed + reliefH,
+                    bevelEnabled: true,
+                    bevelSegments: 1,
+                    bevelSize: 0.25,
+                    bevelThickness: 0.25
+                });
+                geo.rotateX(-Math.PI / 2);
+                geo.translate(cx, H - embed, cz);
+                addSolidMesh(geo, 'triforceGold');
+            };
+
+            // Los 3 triángulos de la Trifuerza (Sabiduría, Poder, Valor)
+            createTriangleMesh(0, -hTri / 3, triSize / 2);
+            createTriangleMesh(-triSize / 4, hTri / 6, triSize / 2);
+            createTriangleMesh(triSize / 4, hTri / 6, triSize / 2);
+
+            // 4. Los 3 Diamantes de los 3 Días (Ciclo de 72 Horas) en la parte delantera del dial
+            for (let d = -1; d <= 1; d++) {
+                const diamondS = R * 0.055;
+                const dmShape = new THREE.Shape();
+                dmShape.moveTo(0, diamondS);
+                dmShape.lineTo(diamondS * 0.7, 0);
+                dmShape.lineTo(0, -diamondS);
+                dmShape.lineTo(-diamondS * 0.7, 0);
+                dmShape.closePath();
+
+                const dmGeo = new THREE.ExtrudeGeometry(dmShape, {
+                    depth: embed + reliefH * 0.85,
+                    bevelEnabled: false
+                });
+                dmGeo.rotateX(-Math.PI / 2);
+                dmGeo.translate(d * (R * 0.16), H - embed, R * 0.42);
+                addSolidMesh(dmGeo, 'triforceGold');
+            }
+        }
+
+        // ============================================================================
+        // ESCULTURA GEOMÉTRICA 3D: LA MÁSCARA DE MAJORA (EMBLEMA FRONTAL)
+        // Sólida, sin voladizos imposibles y fusionada con el zócalo delantero
+        // ============================================================================
+        function buildMajorasMaskEmblem(R, H, userScale) {
+            const maskGroup = new THREE.Group();
+
+            // Escala proporcional al diámetro de la peana y ajuste del usuario
+            const s = (R / 37.5) * userScale * 0.95;
+
+            // 0. Pedestal / Escudo de soporte trasero que une la máscara con la base hasta Y=0
+            const mountGeo = new THREE.CylinderGeometry(8.5 * s, 10.5 * s, H * 0.95, 16);
+            mountGeo.scale(1.15, 1, 0.65);
+            mountGeo.translate(0, (H * 0.95) / 2, R * 0.88);
+            addSolidMesh(mountGeo, 'stoneDark');
+
+            // 1. Silueta de Corazón Tribal de la Máscara de Majora
+            const heartShape = new THREE.Shape();
+            heartShape.moveTo(0, -9.5 * s); // Mentón puntiagudo inferior
+            heartShape.bezierCurveTo(6.5 * s, -6.5 * s, 11.5 * s, -0.5 * s, 10.5 * s, 5.2 * s);
+            heartShape.bezierCurveTo(9.8 * s, 9.2 * s, 4.2 * s, 10.2 * s, 0, 7.2 * s); // Hendidura superior central
+            heartShape.bezierCurveTo(-4.2 * s, 10.2 * s, -9.8 * s, 9.2 * s, -10.5 * s, 5.2 * s);
+            heartShape.bezierCurveTo(-11.5 * s, -0.5 * s, -6.5 * s, -6.5 * s, 0, -9.5 * s);
+
+            const maskBodyGeo = new THREE.ExtrudeGeometry(heartShape, {
+                depth: 3.4 * s,
+                bevelEnabled: true,
+                bevelSegments: 4,
+                steps: 2,
+                bevelSize: 1.4 * s,
+                bevelThickness: 1.6 * s,
+                curveSegments: 32
+            });
+
+            // Curvar suavemente el escudo de la máscara (abombado convexo auténtico)
+            const pos = maskBodyGeo.attributes.position;
+            for (let i = 0; i < pos.count; i++) {
+                const vx = pos.getX(i);
+                const vy = pos.getY(i);
+                const vz = pos.getZ(i);
+                if (vz > 0) {
+                    const distSq = (vx * vx + vy * vy) / (120 * s * s);
+                    pos.setZ(i, vz + Math.max(0, (1.8 * s) * (1 - distSq * 0.65)));
+                }
+            }
+            maskBodyGeo.computeVertexNormals();
+            maskGroup.add(createSubMesh(maskBodyGeo, 'maskPurple'));
+
+            // 2. Grandes Ojos Hipnóticos en Altorrelieve (Izquierdo y Derecho)
+            [-4.3 * s, 4.3 * s].forEach((eyeX) => {
+                // Anillo exterior naranja/rojo del ojo
+                const eyeSocketGeo = new THREE.CylinderGeometry(3.2 * s, 3.6 * s, 2.6 * s, 28);
+                eyeSocketGeo.rotateX(Math.PI / 2);
+                eyeSocketGeo.translate(eyeX, 1.4 * s, 3.8 * s);
+                maskGroup.add(createSubMesh(eyeSocketGeo, 'maskRed'));
+
+                // Globo ocular verde lima convexo
+                const eyeDomeGeo = new THREE.SphereGeometry(2.65 * s, 24, 16);
+                eyeDomeGeo.scale(1, 1, 0.55);
+                eyeDomeGeo.translate(eyeX, 1.4 * s, 4.6 * s);
+                maskGroup.add(createSubMesh(eyeDomeGeo, 'maskEyeGreen'));
+
+                // Iris / Anillo interno amarillo
+                const irisGeo = new THREE.CylinderGeometry(1.45 * s, 1.65 * s, 1.2 * s, 24);
+                irisGeo.rotateX(Math.PI / 2);
+                irisGeo.translate(eyeX, 1.4 * s, 5.2 * s);
+                maskGroup.add(createSubMesh(irisGeo, 'maskOrange'));
+
+                // Pupila central en relieve para facilitar el pintado a pincel
+                const pupilGeo = new THREE.SphereGeometry(0.85 * s, 16, 12);
+                pupilGeo.scale(1, 1, 0.6);
+                pupilGeo.translate(eyeX, 1.4 * s, 5.7 * s);
+                maskGroup.add(createSubMesh(pupilGeo, 'maskYellow'));
+            });
+
+            // 3. Cresta / Cejas Tribales Superiores y Diamante Frontal
+            const diamondShape = new THREE.Shape();
+            diamondShape.moveTo(0, 6.2 * s);
+            diamondShape.lineTo(1.5 * s, 3.8 * s);
+            diamondShape.lineTo(0, 1.4 * s);
+            diamondShape.lineTo(-1.5 * s, 3.8 * s);
+            diamondShape.closePath();
+            const centerGemGeo = new THREE.ExtrudeGeometry(diamondShape, {
+                depth: 2.2 * s,
+                bevelEnabled: true,
+                bevelSegments: 1,
+                bevelSize: 0.3 * s,
+                bevelThickness: 0.3 * s
+            });
+            centerGemGeo.translate(0, 0, 3.6 * s);
+            maskGroup.add(createSubMesh(centerGemGeo, 'maskTeal'));
+
+            // Marcas tribales inferiores bajo los ojos (relieve geométrico)
+            [-3.2 * s, 3.2 * s].forEach((cheekX, idx) => {
+                const dir = idx === 0 ? -1 : 1;
+                const cheekGeo = new THREE.BoxGeometry(2.8 * s, 1.1 * s, 1.8 * s);
+                cheekGeo.rotateZ(dir * 0.45);
+                cheekGeo.translate(cheekX, -3.8 * s, 4.1 * s);
+                maskGroup.add(createSubMesh(cheekGeo, 'maskTeal'));
+            });
+
+            // 4. Los 10 Cuernos / Púas Tribales Característicos de la Máscara de Majora
+            // (2 cuernos superiores + 4 púas laterales izquierdas + 4 púas laterales derechas)
+            const spikeConfigs = [
+                // Cuernos superiores (rojos/naranjas)
+                { x: -5.5, y: 8.2, angle: 0.45, len: 4.8, rad: 1.7, color: 'maskRed' },
+                { x:  5.5, y: 8.2, angle: -0.45, len: 4.8, rad: 1.7, color: 'maskRed' },
+                // 4 Púas laterales izquierdas (amarillas/naranjas)
+                { x: -10.2, y:  3.8, angle: 1.25, len: 4.6, rad: 1.45, color: 'maskYellow' },
+                { x: -10.0, y:  0.8, angle: 1.48, len: 4.4, rad: 1.40, color: 'maskOrange' },
+                { x: -8.6,  y: -2.2, angle: 1.72, len: 4.1, rad: 1.35, color: 'maskYellow' },
+                { x: -6.4,  y: -5.0, angle: 1.98, len: 3.7, rad: 1.25, color: 'maskOrange' },
+                // 4 Púas laterales derechas (amarillas/naranjas)
+                { x:  10.2, y:  3.8, angle: -1.25, len: 4.6, rad: 1.45, color: 'maskYellow' },
+                { x:  10.0, y:  0.8, angle: -1.48, len: 4.4, rad: 1.40, color: 'maskOrange' },
+                { x:  8.6,  y: -2.2, angle: -1.72, len: 4.1, rad: 1.35, color: 'maskYellow' },
+                { x:  6.4,  y: -5.0, angle: -1.98, len: 3.7, rad: 1.25, color: 'maskOrange' }
+            ];
+
+            spikeConfigs.forEach(sp => {
+                // Cono truncado grueso apto para boquilla FDM 0.4mm y Resina
+                const coneGeo = new THREE.ConeGeometry(sp.rad * s, sp.len * s, 16);
+                coneGeo.translate(0, (sp.len * s) / 2 - (0.8 * s), 0); // Hundido en el borde de la máscara
+                coneGeo.rotateZ(sp.angle);
+                coneGeo.translate(sp.x * s, sp.y * s, 1.8 * s);
+                maskGroup.add(createSubMesh(coneGeo, sp.color));
+            });
+
+            // Posicionar e inclinar el grupo de la máscara sobre el bisel frontal (+Z)
+            // Además, recortamos cualquier vértice por debajo de Y=0 para mantener la cama de impresión 100% plana
+            maskGroup.rotation.x = -0.58; // Inclinación hacia arriba (~55 grados respecto a la horizontal)
+            maskGroup.position.set(0, H * 0.58, R * 0.89);
+            maskGroup.updateMatrixWorld(true);
+
+            // Hornear las transformaciones de cada parte de la máscara y asegurar plano Z=0 inferior (Y>=0 en Three.js)
+            maskGroup.children.forEach(child => {
+                const bakedGeo = child.geometry.clone();
+                bakedGeo.applyMatrix4(child.matrixWorld);
+
+                // Garantizar que ninguna punta inferior baje de Y = 0.0 (cama de impresión plana)
+                const p = bakedGeo.attributes.position;
+                for (let k = 0; k < p.count; k++) {
+                    if (p.getY(k) < 0) {
+                        p.setY(k, 0);
+                    }
+                }
+                bakedGeo.computeVertexNormals();
+                addSolidMesh(bakedGeo, child.userData.matKey);
+            });
+        }
+
+        // ============================================================================
+        // MONOLITOS Y CRISTALES TRASEROS (ENMARCAN LA FIGURA POR DETRÁS)
+        // Todos nacen desde Y=0 para máxima resistencia estructural e impresión sin soportes
+        // ============================================================================
+        function buildBackPillarsAndCrystals(R, H) {
+            const pillarSpecs = [
+                { angle: -Math.PI * 0.72, dist: 0.84, rad: 0.13, heightFactor: 1.75, tiltX: 0.12, tiltZ: -0.08, type: 'pillar' },
+                { angle: -Math.PI * 0.58, dist: 0.85, rad: 0.11, heightFactor: 2.20, tiltX: 0.08, tiltZ: -0.05, type: 'crystal' },
+                { angle: -Math.PI * 0.50, dist: 0.86, rad: 0.15, heightFactor: 1.55, tiltX: 0.15, tiltZ: 0.0,   type: 'pillar' },
+                { angle: -Math.PI * 0.42, dist: 0.85, rad: 0.11, heightFactor: 2.05, tiltX: 0.08, tiltZ: 0.05,  type: 'crystal' },
+                { angle: -Math.PI * 0.28, dist: 0.84, rad: 0.13, heightFactor: 1.65, tiltX: 0.12, tiltZ: 0.08,  type: 'pillar' }
+            ];
+
+            pillarSpecs.forEach(spec => {
+                const pRadius = R * spec.rad;
+                const pHeight = H * spec.heightFactor;
+                const sides = spec.type === 'pillar' ? 6 : 5;
+
+                const geo = new THREE.CylinderGeometry(pRadius * 0.72, pRadius * 1.15, pHeight, sides);
+
+                // Corte biselado en la cúspide estilo ruina antigua / cristal tallado
+                const pos = geo.attributes.position;
+                for (let i = 0; i < pos.count; i++) {
+                    const vy = pos.getY(i);
+                    const vx = pos.getX(i);
+                    const vz = pos.getZ(i);
+                    if (vy > 0) {
+                        // Inclinación del corte superior hacia el centro de la peana
+                        const bevelOffset = (vx * 0.35 + vz * 0.45);
+                        pos.setY(i, vy + bevelOffset);
+                    }
+                }
+
+                // Trasladar para que la base nazca en Y=0
+                geo.translate(0, pHeight / 2, 0);
+                geo.rotateX(spec.tiltX);
+                geo.rotateZ(spec.tiltZ);
+
+                const px = Math.cos(spec.angle) * (R * spec.dist);
+                const pz = Math.sin(spec.angle) * (R * spec.dist);
+                geo.translate(px, 0, pz);
+
+                // Asegurar que la base del pilar quede perfectamente al ras en Y=0
+                for (let i = 0; i < pos.count; i++) {
+                    if (pos.getY(i) < 0) pos.setY(i, 0);
+                }
+                geo.computeVertexNormals();
+
+                addSolidMesh(geo, spec.type === 'pillar' ? 'stoneDark' : 'crystalPurple');
+            });
+        }
+
+        // ============================================================================
+        // PERNOS / BASES DE ANCLAJE PARA POSAR LA FIGURA EN EL CENTRO
+        // ============================================================================
+        function buildFigurePegs(R, H) {
+            const pegRadius = 1.6; // Diámetro 3.2mm estándar para figuras
+            const pegHeight = 4.5; // 4.5mm de perno sobresaliente
+
+            if (state.pegMode === 'single') {
+                // 1 Perno cilíndrico central macizo
+                const pegGeo = new THREE.CylinderGeometry(pegRadius * 0.95, pegRadius, pegHeight + 2.0, 24);
+                pegGeo.translate(0, H + (pegHeight / 2) - 1.0, 0);
+                addSolidMesh(pegGeo, 'triforceGold');
+            } else if (state.pegMode === 'double') {
+                // 2 Casquillos (sockets con borde reforzado) separados para ambos pies
+                const footOffset = R * 0.28;
+                [-footOffset, footOffset].forEach(xPos => {
+                    const socketShape = new THREE.Shape();
+                    socketShape.absarc(0, 0, pegRadius + 1.6, 0, Math.PI * 2, false);
+                    const hole = new THREE.Path();
+                    hole.absarc(0, 0, pegRadius, 0, Math.PI * 2, true);
+                    socketShape.holes.push(hole);
+
+                    const socketGeo = new THREE.ExtrudeGeometry(socketShape, {
+                        depth: 3.2,
+                        bevelEnabled: true,
+                        bevelSegments: 1,
+                        bevelSize: 0.3,
+                        bevelThickness: 0.3,
+                        curveSegments: 24
+                    });
+                    socketGeo.rotateX(-Math.PI / 2);
+                    socketGeo.translate(xPos, H - 0.8, 0);
+                    addSolidMesh(socketGeo, 'stoneDark');
+                });
+            }
+        }
+
+        // ============================================================================
+        // UTILIDADES DE CONSTRUCCIÓN DE MALLAS Y CÁLCULO DE MÉTRICAS
+        // ============================================================================
+        function createSubMesh(geometry, matKey) {
+            const mesh = new THREE.Mesh(geometry, getMat(matKey));
+            mesh.userData.matKey = matKey;
+            return mesh;
+        }
+
+        function addSolidMesh(geometry, matKey) {
+            const mesh = new THREE.Mesh(geometry, getMat(matKey));
+            mesh.castShadow = true;
+            mesh.receiveShadow = true;
+            mesh.userData.matKey = matKey;
+            baseGroup.add(mesh);
+        }
+
+        function refreshMaterialsOnScene() {
+            baseGroup.traverse(obj => {
+                if (obj.isMesh && obj.userData.matKey) {
+                    obj.material = getMat(obj.userData.matKey);
+                }
+            });
+        }
+
+        function updateMetricsDisplay() {
+            const box = new THREE.Box3().setFromObject(baseGroup);
+            const size = new THREE.Vector3();
+            box.getSize(size);
+
+            document.getElementById('dim-x').textContent = size.x.toFixed(1);
+            document.getElementById('dim-z').textContent = size.z.toFixed(1);
+            document.getElementById('dim-y').textContent = size.y.toFixed(1);
+
+            let totalTris = 0;
+            baseGroup.traverse(obj => {
+                if (obj.isMesh && obj.geometry) {
+                    const geom = obj.geometry;
+                    totalTris += geom.index ? geom.index.count / 3 : geom.attributes.position.count / 3;
+                }
+            });
+            document.getElementById('poly-count').textContent = `${Math.round(totalTris).toLocaleString()} triángulos`;
+        }
+
+        // ============================================================================
+        // EXPORTACIÓN A STL BINARIO LISTO PARA CURA / PRUSASLICER / BAMBU STUDIO
+        // Orienta automáticamente Z-Up (estándar en impresión 3D) y escala en milímetros
+        // ============================================================================
+        function exportToSTL() {
+            const exporter = new THREE.STLExporter();
+
+            // Clonar el grupo para rotarlo al sistema de coordenadas Z-Up de los laminadores 3D
+            // En Three.js Y es arriba; en STL / Slicers (Cura, PrusaSlicer) Z es arriba.
+            const exportClone = baseGroup.clone(true);
+            exportClone.rotation.set(Math.PI / 2, 0, 0);
+            exportClone.updateMatrixWorld(true);
+
+            const stlBinary = exporter.parse(exportClone, { binary: true });
+            const blob = new Blob([stlBinary], { type: 'application/octet-stream' });
+            const url = URL.createObjectURL(blob);
+
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = `Peana_Majoras_Mask_${state.diameter}mm.stl`;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            URL.revokeObjectURL(url);
+
+            showToast();
+        }
+
+        function showToast() {
+            const toast = document.getElementById('toast');
+            toast.classList.remove('translate-y-24', 'opacity-0');
+            setTimeout(() => {
+                toast.classList.add('translate-y-24', 'opacity-0');
+            }, 4000);
+        }
+
+        // ============================================================================
+        // INTERACCIÓN UI Y CONTROLES DE CÁMARA
+        // ============================================================================
+        function bindUIEvents() {
+            const diameterInput = document.getElementById('param-diameter');
+            const heightInput = document.getElementById('param-height');
+            const maskCheckbox = document.getElementById('param-mask');
+            const maskScaleInput = document.getElementById('param-mask-scale');
+            const pillarsCheckbox = document.getElementById('param-pillars');
+            const reliefInput = document.getElementById('param-relief');
+
+            diameterInput.addEventListener('input', (e) => {
+                state.diameter = parseFloat(e.target.value);
+                document.getElementById('val-diameter').textContent = `${state.diameter} mm`;
+                rebuildBaseModel();
+            });
+
+            heightInput.addEventListener('input', (e) => {
+                state.height = parseFloat(e.target.value);
+                document.getElementById('val-height').textContent = `${state.height} mm`;
+                rebuildBaseModel();
+            });
+
+            maskCheckbox.addEventListener('change', (e) => {
+                state.showMask = e.target.checked;
+                document.getElementById('mask-scale-container').style.opacity = state.showMask ? '1' : '0.4';
+                rebuildBaseModel();
+            });
+
+            maskScaleInput.addEventListener('input', (e) => {
+                const pct = parseInt(e.target.value);
+                state.maskScale = pct / 100;
+                document.getElementById('val-mask-scale').textContent = `${pct}%`;
+                rebuildBaseModel();
+            });
+
+            pillarsCheckbox.addEventListener('change', (e) => {
+                state.showPillars = e.target.checked;
+                rebuildBaseModel();
+            });
+
+            reliefInput.addEventListener('input', (e) => {
+                state.reliefHeight = parseFloat(e.target.value);
+                document.getElementById('val-relief').textContent = `${state.reliefHeight.toFixed(1)} mm`;
+                rebuildBaseModel();
+            });
+        }
+
+        function setQuickDiameter(val) {
+            state.diameter = val;
+            document.getElementById('param-diameter').value = val;
+            document.getElementById('val-diameter').textContent = `${val} mm`;
+            rebuildBaseModel();
+        }
+
+        function setRimStyle(style) {
+            state.rimStyle = style;
+            const btnDod = document.getElementById('rim-dodecagon');
+            const btnRnd = document.getElementById('rim-round');
+            const activeClass = "py-2 px-3 rounded-lg text-xs font-medium border border-yellow-500 bg-purple-900/50 text-yellow-300 transition flex items-center justify-center gap-1.5";
+            const inactiveClass = "py-2 px-3 rounded-lg text-xs font-medium border border-purple-800/60 bg-purple-950/30 text-gray-400 hover:text-gray-200 transition flex items-center justify-center gap-1.5";
+
+            btnDod.className = style === 'dodecagon' ? activeClass : inactiveClass;
+            btnRnd.className = style === 'round' ? activeClass : inactiveClass;
+            rebuildBaseModel();
+        }
+
+        function setPegMode(mode) {
+            state.pegMode = mode;
+            ['none', 'single', 'double'].forEach(m => {
+                const btn = document.getElementById(`peg-${m}`);
+                if (m === mode) {
+                    btn.className = "py-2 px-2 rounded-lg text-xs font-medium border border-yellow-500 bg-purple-900/50 text-yellow-300 transition text-center";
+                } else {
+                    btn.className = "py-2 px-2 rounded-lg text-xs font-medium border border-purple-800/60 bg-purple-950/30 text-gray-400 hover:text-gray-200 transition text-center";
+                }
+            });
+            rebuildBaseModel();
+        }
+
+        function setFinishMode(mode) {
+            state.finishMode = mode;
+            ['painted', 'resin', 'gold', 'wireframe'].forEach(m => {
+                const btn = document.getElementById(`btn-mode-${m}`);
+                if (m === mode) {
+                    btn.classList.add('border-yellow-500/60', 'bg-purple-950/70', 'text-yellow-300');
+                    btn.classList.remove('text-gray-300');
+                } else {
+                    btn.classList.remove('border-yellow-500/60', 'bg-purple-950/70', 'text-yellow-300');
+                    btn.classList.add('text-gray-300');
+                }
+            });
+            refreshMaterialsOnScene();
+        }
+
+        function resetCamera(view) {
+            controls.autoRotate = false;
+            updateAutoRotateButton();
+            const d = state.diameter * 1.65;
+
+            if (view === 'iso') {
+                camera.position.set(d * 0.6, d * 0.75, d * 1.1);
+                controls.target.set(0, state.height * 0.5, 0);
+            } else if (view === 'top') {
+                camera.position.set(0, d * 1.4, 0.01);
+                controls.target.set(0, 0, 0);
+            } else if (view === 'front') {
+                camera.position.set(0, state.height * 1.4, d * 1.15);
+                controls.target.set(0, state.height * 0.5, 0);
+            }
+            controls.update();
+        }
+
+        function toggleAutoRotate() {
+            controls.autoRotate = !controls.autoRotate;
+            updateAutoRotateButton();
+        }
+
+        function updateAutoRotateButton() {
+            const btn = document.getElementById('btn-autorotate');
+            if (controls.autoRotate) {
+                btn.classList.add('text-yellow-400', 'border-yellow-500/40');
+                btn.classList.remove('text-purple-200');
+            } else {
+                btn.classList.remove('text-yellow-400', 'border-yellow-500/40');
+                btn.classList.add('text-purple-200');
+            }
+        }
+
+        function onWindowResize() {
+            const container = document.getElementById('canvas-container');
+            camera.aspect = container.clientWidth / container.clientHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(container.clientWidth, container.clientHeight);
+        }
+
+        function animate() {
+            requestAnimationFrame(animate);
+            controls.update();
+            renderer.render(scene, camera);
+        }
+
+        window.onload = initThree;
+    </script>
+</body>
+</html>
+```
